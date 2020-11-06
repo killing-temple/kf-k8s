@@ -1,0 +1,74 @@
+# Killing Temple KF2 Server Manifest
+# Generated from StatefulSet template for <deployment_slot>
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: kf2-stable-ds01
+spec:
+  serviceName: "kf2-stable-ds01-app"
+  selector:
+    matchLabels:
+      app: kf2-stable-ds01
+  replicas: 1 
+  template:
+    metadata:
+      labels:
+        app: kf2-stable-ds01
+    spec:      
+      initContainers:
+      - name: kf2-init
+        image: busybox:latest
+        command: ["/bin/bash"]
+        args: ["-c", "mkdir /home/steam/.steam/SteamApps/common/kf2server/KFGame/Config/tmp;
+          git clone https://github.com/killing-temple/kf2-game-configs.git /home/steam/.steam/SteamApps/common/kf2server/KFGame/Config/tmp;
+          mv /home/steam/.steam/SteamApps/common/kf2server/KFGame/Config/tmp/ds01/* /home/steam/.steam/SteamApps/common/kf2server/KFGame/Config;
+          rm -rf /home/steam/.steam/SteamApps/common/kf2server/KFGame/Config/tmp"]
+        volumeMounts:
+        - name: kf2-stable-ds01-cfgvol
+          mountPath: "/home/steam/.steam/SteamApps/common/kf2server/KFGame/Config"
+      containers:
+      - name: kf2-stable
+        image: dwurf/docker-kf2:latest
+        resources:
+          requests:
+            memory: "512Mi"
+          limits:
+            memory: "1024Mi"
+        ports:
+          - containerPort: 7777
+            name: "game"
+          - containerPort: 27015
+            name: "query"
+          - containerPort: 8080
+            name: "webmin"
+          - containerPort: 20560
+            name: "steam"
+        volumeMounts:
+        - name: kf2-stable-ds01-configs
+          mountPath: "/home/steam/.steam/SteamApps/common/kf2server/KFGame/Config"
+        - name: kf2-stable-server
+          mountPath: "/home/steam/.steam/SteamApps/common/kf2server"
+      volumes:
+      - name: kf2-stable-server
+        mountPath: "/home/steam/.steam/SteamApps/common/kf2server"
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 1
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                  - key: "app"
+                    operator: In
+                    values:
+                    - kf2-stable-ds01
+              topologyKey: "kubernetes.io/hostname"
+  volumeClaimTemplates:
+  - metadata:
+      name: kf2-stable-ds01-cfgvol
+    spec:
+      accessModes: [ "ReadWriteMany" ]
+      resources:
+        requests:
+          storage: 10Mi
